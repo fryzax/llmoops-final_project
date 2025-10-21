@@ -1,7 +1,14 @@
 """Pipeline compilation and submission utilities for Vertex AI."""
 
+import os
+from pathlib import Path
+from dotenv import load_dotenv
 from google.cloud import aiplatform
 from kfp import compiler
+
+# Load environment variables from .env file
+env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(env_path)
 
 from src.constants import (
     PIPELINE_ROOT_PATH,

@@ -1,1 +1,37 @@
 .env
+# Artefacts Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+
+# Environnements / builds
+.venv/
+build/
+dist/
+
+# Local / secrets
+.env
+
+# Artefacts de compilation pipeline
+model_training_pipeline.json
+# Artefacts Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+
+# Environnements / builds
+.venv/
+build/
+dist/
+
+# Local / secrets
+.env
+
+# Artefacts de compilation pipeline
+model_training_pipeline.json
