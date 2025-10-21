@@ -2,9 +2,9 @@
 name = "albertschool-llmops"
 version = "0.1.0"
 description = "Course materials for the LLMOps class for Albert School!"
-authors = ["Mathieu Soul <mathieus@sicara.com>"]
+authors = [{name = "Mathieu", email = "mathieu.souesme@gmail.com"}]
 readme = "README.md"
-requires-python = "==3.11.6"
+requires-python = ">=3.11"
 dependencies = [
     "google-cloud-aiplatform[prediction]>=1.38.0",
     "google-cloud-storage>=2.10.0",

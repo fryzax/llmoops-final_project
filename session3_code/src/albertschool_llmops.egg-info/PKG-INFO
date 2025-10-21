@@ -1,0 +1,78 @@
+Metadata-Version: 2.4
+Name: albertschool-llmops
+Version: 0.1.0
+Summary: Course materials for the LLMOps class for Albert School!
+Author-email: Mathieu <mathieu.souesme@gmail.com>
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: google-cloud-aiplatform[prediction]>=1.38.0
+Requires-Dist: google-cloud-storage>=2.10.0
+Requires-Dist: pandas>=2.3.2
+Requires-Dist: kfp>=2.0.0
+Requires-Dist: datasets>=4.1.1
+Requires-Dist: ipykernel>=6.30.1
+Requires-Dist: ragas>=0.3.5
+Requires-Dist: rouge-score>=0.1.2
+Requires-Dist: gcsfs>=2025.9.0
+Requires-Dist: tensorboard>=2.20.0
+Requires-Dist: rapidfuzz>=3.14.1
+Requires-Dist: sacrebleu>=2.5.1
+Requires-Dist: transformers==4.46.*
+Requires-Dist: accelerate>=1.10.1
+Requires-Dist: trl>=0.17.0
+Requires-Dist: peft==0.13.2
+
+# LLMOps Practice Answers Repository
+> Practice answers for the LLMOps class for Albert School!
+
+## Project requirements
+
+### Astral/uv
+
+- Install [uv](https://github.com/astral-sh/uv) to manage your Python version, virtual environments, dependencies and
+tooling configs: see [installation docs](https://github.com/astral-sh/uv?tab=readme-ov-file#installation).
+
+
+## Installation
+
+### Python virtual environment and dependencies
+
+Run the following command:
+```bash
+uv sync
+```
+
+## GCP Setup
+
+### Prerequisites
+
+1. Install [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) if not already installed
+2. Create or identify a GCP project for the LLMOps class
+
+### Authentication and Project Configuration
+
+1. Authenticate with your Google account:
+   ```bash
+   gcloud auth login
+   gcloud auth application-default login
+   ```
+
+2. Set your project ID:
+   ```bash
+   gcloud config set project YOUR_PROJECT_ID
+   ```
+
+### Enable Required APIs
+
+Enable the necessary GCP services:
+
+```bash
+gcloud services enable aiplatform.googleapis.com
+gcloud services enable storage-component.googleapis.com
+gcloud services enable cloudresourcemanager.googleapis.com
+```
+
+### Environment Variables
+
+Create a `.env` file in the project root that matches the .env.example file.
+Upload the dataset to the matching GCS bucket and filename!
