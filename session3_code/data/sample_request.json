@@ -1,0 +1,12 @@
+{
+  "instances": [
+    {
+      "input": "<|user|>Teach me the ways of the Force.<|end|><|assistant|>"
+    }
+  ],
+  "parameters": {
+    "max_new_tokens": 64,
+    "temperature": 0.7,
+    "top_p": 0.9
+  }
+}

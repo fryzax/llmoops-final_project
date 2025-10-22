@@ -1,0 +1,377 @@
+{
+  "components": {
+    "comp-data-transformation-component": {
+      "executorLabel": "exec-data-transformation-component",
+      "inputDefinitions": {
+        "parameters": {
+          "raw_dataset_uri": {
+            "parameterType": "STRING"
+          },
+          "train_test_split_ratio": {
+            "parameterType": "NUMBER_DOUBLE"
+          }
+        }
+      },
+      "outputDefinitions": {
+        "artifacts": {
+          "test_dataset": {
+            "artifactType": {
+              "schemaTitle": "system.Dataset",
+              "schemaVersion": "0.0.1"
+            }
+          },
+          "train_dataset": {
+            "artifactType": {
+              "schemaTitle": "system.Dataset",
+              "schemaVersion": "0.0.1"
+            }
+          }
+        }
+      }
+    },
+    "comp-evaluation-component": {
+      "executorLabel": "exec-evaluation-component",
+      "inputDefinitions": {
+        "artifacts": {
+          "predictions": {
+            "artifactType": {
+              "schemaTitle": "system.Dataset",
+              "schemaVersion": "0.0.1"
+            }
+          }
+        }
+      },
+      "outputDefinitions": {
+        "artifacts": {
+          "evaluation_results": {
+            "artifactType": {
+              "schemaTitle": "system.Dataset",
+              "schemaVersion": "0.0.1"
+            }
+          },
+          "metrics": {
+            "artifactType": {
+              "schemaTitle": "system.Metrics",
+              "schemaVersion": "0.0.1"
+            }
+          }
+        }
+      }
+    },
+    "comp-fine-tuning-component": {
+      "executorLabel": "exec-fine-tuning-component",
+      "inputDefinitions": {
+        "artifacts": {
+          "dataset": {
+            "artifactType": {
+              "schemaTitle": "system.Dataset",
+              "schemaVersion": "0.0.1"
+            }
+          }
+        }
+      },
+      "outputDefinitions": {
+        "artifacts": {
+          "metrics": {
+            "artifactType": {
+              "schemaTitle": "system.Metrics",
+              "schemaVersion": "0.0.1"
+            }
+          },
+          "model": {
+            "artifactType": {
+              "schemaTitle": "system.Model",
+              "schemaVersion": "0.0.1"
+            }
+          }
+        }
+      }
+    },
+    "comp-inference-component": {
+      "executorLabel": "exec-inference-component",
+      "inputDefinitions": {
+        "artifacts": {
+          "dataset": {
+            "artifactType": {
+              "schemaTitle": "system.Dataset",
+              "schemaVersion": "0.0.1"
+            }
+          },
+          "model": {
+            "artifactType": {
+              "schemaTitle": "system.Model",
+              "schemaVersion": "0.0.1"
+            }
+          }
+        }
+      },
+      "outputDefinitions": {
+        "artifacts": {
+          "predictions": {
+            "artifactType": {
+              "schemaTitle": "system.Dataset",
+              "schemaVersion": "0.0.1"
+            }
+          }
+        }
+      }
+    }
+  },
+  "deploymentSpec": {
+    "executors": {
+      "exec-data-transformation-component": {
+        "container": {
+          "args": [
+            "--executor_input",
+            "{{$}}",
+            "--function_to_execute",
+            "data_transformation_component"
+          ],
+          "command": [
+            "sh",
+            "-c",
+            "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location 'kfp==2.8.0' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&  python3 -m pip install --quiet --no-warn-script-location 'pandas>=2.3.2' 'datasets==4.0.0' 'gcsfs' && \"$0\" \"$@\"\n",
+            "sh",
+            "-ec",
+            "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef data_transformation_component(\n    raw_dataset_uri: str,\n    train_test_split_ratio: float,\n    train_dataset: OutputPath(\"Dataset\"),  # type: ignore\n    test_dataset: OutputPath(\"Dataset\"),  # type: ignore\n) -> None:\n    \"\"\"Format and split Yoda Sentences for Phi-3 fine-tuning.\"\"\"\n    import logging\n\n    import pandas as pd\n    from datasets import Dataset\n\n    def format_dataset_to_phi_messages(dataset: Dataset) -> Dataset:\n        \"\"\"Format dataset to Phi messages structure.\"\"\"\n\n        def format_dataset(examples):\n            \"\"\"Format a single example to Phi messages structure.\"\"\"\n            converted_sample = [\n                {\"role\": \"user\", \"content\": examples[\"prompt\"]},\n                {\"role\": \"assistant\", \"content\": examples[\"completion\"]},\n            ]\n            return {\"messages\": converted_sample}\n\n        return (\n            dataset.rename_column(\"sentence\", \"prompt\")\n            .rename_column(\"translation_extra\", \"completion\")\n            .map(format_dataset)\n            .remove_columns([\"prompt\", \"completion\", \"translation\"])\n        )\n\n    logging.basicConfig(level=logging.INFO)\n    logger = logging.getLogger(__name__)\n    logger.info(\"Starting data transformation process...\")\n\n    logger.info(f\"Reading from {raw_dataset_uri}\")\n    dataset = Dataset.from_pandas(pd.read_csv(raw_dataset_uri))\n\n    logger.info(\"Formatting and splitting dataset...\")\n    formatted_dataset = format_dataset_to_phi_messages(dataset)\n    split_dataset = formatted_dataset.train_test_split(test_size=train_test_split_ratio)\n\n    logger.info(f\"Writing train dataset to {train_dataset}...\")\n    split_dataset[\"train\"].to_csv(train_dataset, index=False)\n\n    logger.info(f\"Writing test dataset to {test_dataset}...\")\n    split_dataset[\"test\"].to_csv(test_dataset, index=False)\n\n    logger.info(\"Data transformation process completed successfully\")\n\n"
+          ],
+          "image": "python:3.11-slim"
+        }
+      },
+      "exec-evaluation-component": {
+        "container": {
+          "args": [
+            "--executor_input",
+            "{{$}}",
+            "--function_to_execute",
+            "evaluation_component"
+          ],
+          "command": [
+            "sh",
+            "-c",
+            "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location 'kfp==2.8.0' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&  python3 -m pip install --quiet --no-warn-script-location 'ragas>=0.3.5' 'rouge-score>=0.1.2' 'sacrebleu>=2.5.1' 'pandas>=2.3.2' 'tqdm' && \"$0\" \"$@\"\n",
+            "sh",
+            "-ec",
+            "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef evaluation_component(\n    predictions: Input[Dataset],\n    metrics: Output[Metrics],\n    evaluation_results: OutputPath(\"Dataset\"),  # type: ignore\n):\n    \"\"\"Computes evaluation metrics on test set predictions.\"\"\"\n    import logging\n\n    import pandas as pd\n    from ragas import SingleTurnSample\n    from ragas.metrics import BleuScore, RougeScore\n    from ragas.metrics.base import SingleTurnMetric\n    from tqdm import tqdm\n\n    logging.basicConfig(level=logging.INFO)\n    logger = logging.getLogger(__name__)\n\n    def compute_metrics(\n        user_input: str,\n        response: str,\n        reference: str,\n        metric_definitions: list[SingleTurnMetric],\n    ) -> dict[str, float | int]:\n        sample = SingleTurnSample(\n            user_input=user_input,\n            response=response,\n            reference=reference,\n        )\n        return {\n            metric_definition.name: metric_definition.single_turn_score(sample)\n            for metric_definition in metric_definitions\n        }\n\n    def compute_aggregated_metrics(\n        evaluations_df: pd.DataFrame, metric_definitions: list[SingleTurnMetric]\n    ) -> dict[str, float]:\n        return {\n            f\"avg_{col}\": evaluations_df[col].mean()\n            for col in [\n                metric_definition.name for metric_definition in metric_definitions\n            ]\n        }\n\n    logger.info(f\"Loading predictions from {predictions.path}\")\n    predictions_df = pd.read_csv(predictions.path)\n\n    metric_definitions = [BleuScore(), RougeScore()]\n\n    logger.info(\"Computing evaluation metrics...\")\n    evaluations = []\n    for _, row in tqdm(predictions_df.iterrows(), total=predictions_df.shape[0]):\n        evaluations.append(\n            compute_metrics(\n                row[\"user_input\"],\n                row[\"response\"],\n                row[\"reference\"],\n                metric_definitions,\n            )\n        )\n\n    evaluations_df = pd.concat([predictions_df, pd.DataFrame(evaluations)], axis=1)\n\n    logger.info(f\"Writing evaluation results to {evaluation_results}...\")\n    evaluations_df.to_csv(evaluation_results, index=False)\n\n    for metric_name, metric_value in compute_aggregated_metrics(\n        evaluations_df, metric_definitions\n    ).items():\n        metrics.log_metric(metric_name, metric_value)\n\n"
+          ],
+          "image": "cicirello/pyaction:3.11"
+        }
+      },
+      "exec-fine-tuning-component": {
+        "container": {
+          "args": [
+            "--executor_input",
+            "{{$}}",
+            "--function_to_execute",
+            "fine_tuning_component"
+          ],
+          "command": [
+            "sh",
+            "-c",
+            "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location 'kfp==2.8.0' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&  python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform>=1.38.0' 'transformers==4.46.*' 'peft==0.13.2' 'accelerate==1.10.1' 'trl==0.17.0' 'bitsandbytes==0.47.0' 'datasets==4.0.0' 'huggingface-hub==0.34.4' 'safetensors==0.6.2' 'pandas==2.2.2' 'numpy==2.0.2' 'tensorboard' 'gcsfs' && \"$0\" \"$@\"\n",
+            "sh",
+            "-ec",
+            "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef fine_tuning_component(\n    dataset: Input[Dataset], metrics: Output[Metrics], model: Output[Model]\n):\n    \"\"\"Fine-tune a Phi-3 model using LoRA and integrate with Vertex AI.\"\"\"\n    import logging\n    import time\n\n    import pandas as pd\n    import torch\n    from datasets import Dataset\n    from peft import (\n        LoraConfig,  # pyright: ignore[reportPrivateImportUsage]\n        get_peft_model,  # pyright: ignore[reportPrivateImportUsage]\n        prepare_model_for_kbit_training,  # pyright: ignore[reportPrivateImportUsage]\n    )\n    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig\n    from trl.trainer.sft_config import SFTConfig\n    from trl.trainer.sft_trainer import SFTTrainer\n\n    logging.basicConfig(level=logging.INFO)\n    logger = logging.getLogger(__name__)\n    logger.info(\"Starting fine tuning process...\")\n\n    hyperparameters = {\n        \"model_name\": \"microsoft/Phi-3-mini-4k-instruct\",\n        \"val_split_ratio\": 0.2,\n        \"lora_r\": 8,\n        \"lora_alpha\": 16,\n        \"lora_dropout\": 0.05,\n        \"learning_rate\": 3e-4,\n        \"num_epochs\": 10,\n        \"batch_size\": 16,\n        \"max_length\": 64,\n        \"gradient_accumulation_steps\": 1,\n    }\n\n    logger.info(\"Creating training configurations...\")\n    bnb_config = BitsAndBytesConfig(\n        load_in_4bit=True,\n        bnb_4bit_quant_type=\"nf4\",\n        bnb_4bit_use_double_quant=True,\n        bnb_4bit_compute_dtype=torch.float32,\n    )\n    lora_config = LoraConfig(\n        r=hyperparameters[\"lora_r\"],\n        lora_alpha=hyperparameters[\"lora_alpha\"],\n        bias=\"none\",\n        lora_dropout=hyperparameters[\"lora_dropout\"],\n        task_type=\"CAUSAL_LM\",\n        target_modules=[\"o_proj\", \"qkv_proj\", \"gate_up_proj\", \"down_proj\"],\n    )\n    sft_config = SFTConfig(\n        output_dir=model.path,\n        gradient_checkpointing=True,\n        gradient_checkpointing_kwargs={\"use_reentrant\": False},\n        gradient_accumulation_steps=hyperparameters[\"gradient_accumulation_steps\"],\n        per_device_train_batch_size=hyperparameters[\"batch_size\"],\n        auto_find_batch_size=True,\n        max_length=hyperparameters[\"max_length\"],\n        packing=True,\n        num_train_epochs=hyperparameters[\"num_epochs\"],\n        learning_rate=hyperparameters[\"learning_rate\"],\n        optim=\"paged_adamw_8bit\",\n        logging_steps=1,\n        logging_dir=metrics.path,\n        report_to=\"tensorboard\",\n        bf16=torch.cuda.is_bf16_supported(including_emulation=False),\n        do_eval=True,\n        eval_strategy=\"epoch\",\n    )\n\n    logger.info(\"Loading pre-trained model...\")\n    pre_trained_model = AutoModelForCausalLM.from_pretrained(\n        hyperparameters[\"model_name\"],\n        device_map=\"cuda:0\",\n        quantization_config=bnb_config,\n        torch_dtype=torch.float16,\n    )\n    pre_trained_model = prepare_model_for_kbit_training(pre_trained_model)\n    pre_trained_model = get_peft_model(pre_trained_model, lora_config)\n\n    logger.info(f\"Loading dataset from {dataset.path}...\")\n    full_dataset = Dataset.from_pandas(\n        pd.read_csv(dataset.path).assign(\n            messages=lambda df: df[\"messages\"].apply(\n                lambda x: eval(x.replace(\"\\n\", \",\"))\n            )\n        )\n    ).train_test_split(test_size=hyperparameters[\"val_split_ratio\"])\n    train_dataset, eval_dataset = (\n        full_dataset[\"train\"],\n        full_dataset[\"test\"],\n    )\n\n    logger.info(\"Creating tokenizer...\")\n    tokenizer = AutoTokenizer.from_pretrained(hyperparameters[\"model_name\"])\n    tokenizer.pad_token = tokenizer.unk_token\n    tokenizer.pad_token_id = tokenizer.unk_token_id\n\n    logger.info(\"Starting training...\")\n    trainer = SFTTrainer(\n        model=pre_trained_model.base_model.model,\n        peft_config=lora_config,\n        processing_class=tokenizer,\n        args=sft_config,\n        train_dataset=train_dataset,\n        eval_dataset=eval_dataset,\n    )\n    training_start_time = time.time()\n    trainer.train()\n    training_end_time = time.time()\n    training_duration = training_end_time - training_start_time\n\n    logger.info(f\"Saving model at {model.path}...\")\n    trainer.save_model(model.path)\n\n    logger.info(\"Logging metrics...\")\n    metrics.log_metric(\"training_time\", training_duration)\n    for metric_name, metric_value in hyperparameters.items():\n        metrics.log_metric(metric_name, metric_value)\n\n"
+          ],
+          "image": "pytorch/pytorch:2.8.0-cuda12.9-cudnn9-devel",
+          "resources": {
+            "accelerator": {
+              "count": "1",
+              "type": "NVIDIA_TESLA_T4"
+            },
+            "cpuLimit": 16.0,
+            "memoryLimit": 50.0
+          }
+        }
+      },
+      "exec-inference-component": {
+        "container": {
+          "args": [
+            "--executor_input",
+            "{{$}}",
+            "--function_to_execute",
+            "inference_component"
+          ],
+          "command": [
+            "sh",
+            "-c",
+            "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location 'kfp==2.8.0' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&  python3 -m pip install --quiet --no-warn-script-location 'google-cloud-storage>=2.10.0' 'transformers==4.46.*' 'peft==0.13.2' 'datasets==4.0.0' 'pandas==2.2.2' 'gcsfs' && \"$0\" \"$@\"\n",
+            "sh",
+            "-ec",
+            "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef inference_component(\n    dataset: Input[Dataset],\n    model: Input[Model],\n    predictions: OutputPath(\"Dataset\"),  # type: ignore\n):\n    \"\"\"Computes predictions on the test dataset.\"\"\"\n    import logging\n    import re\n    from pathlib import Path\n    from typing import Any\n\n    import pandas as pd\n    import torch\n    from google.cloud import storage\n    from tqdm import tqdm\n    from transformers import AutoModelForCausalLM, AutoTokenizer\n\n    logging.basicConfig(level=logging.INFO)\n    logger = logging.getLogger(__name__)\n\n    def download_model(model_uri: str, local_dir: str):\n        \"\"\"Download model from GCS to local directory.\"\"\"\n        bucket_name, prefix = model_uri.replace(\"gs://\", \"\").split(\"/\", 1)\n\n        bucket = storage.Client().get_bucket(bucket_name)\n        for blob in bucket.list_blobs(prefix=prefix):\n            filename = blob.name.split(\"/\")[-1]\n            if filename != \"\":\n                blob.download_to_filename(f\"{local_dir}/{filename}\")\n\n    def build_prompt(tokenizer: AutoTokenizer, sentence: str):\n        \"\"\"Build a prompt from a sentence applying the chat template.\"\"\"\n        return tokenizer.apply_chat_template(  # type: ignore\n            [\n                {\"role\": \"user\", \"content\": sentence},\n            ],\n            tokenize=False,\n            add_generation_prompt=True,\n        )\n\n    def generate(\n        model: AutoModelForCausalLM,\n        tokenizer: AutoTokenizer,\n        prompt: str,\n        **kwargs: Any,\n    ):\n        tokenized_input = tokenizer(\n            prompt,\n            add_special_tokens=False,\n            return_tensors=\"pt\",\n        ).to(model.device)  # type: ignore\n\n        generation_output = model.generate(  # type: ignore\n            **tokenized_input,\n            eos_token_id=tokenizer.eos_token_id,  # type: ignore\n            **kwargs,\n        )\n        return tokenizer.batch_decode(  # type: ignore\n            generation_output, skip_special_tokens=False\n        )[0]\n\n    def extract_response(generated_text: str) -> str:\n        \"\"\"Extract the model's response from the generated text.\"\"\"\n        return re.findall(\n            r\"(?:<\\|assistant\\|>)([^<]*)\",\n            generated_text,\n        )[0]\n\n    local_dir = Path(\"model\")\n    local_dir.mkdir(parents=True, exist_ok=True)\n    repo_id = \"microsoft/Phi-3-mini-4k-instruct\"\n\n    logger.info(f\"Downloading model from {model.uri} to {local_dir}...\")\n    download_model(model.uri, str(local_dir))\n\n    logger.info(\"Loading tokenizer and model...\")\n    tokenizer = AutoTokenizer.from_pretrained(repo_id)\n    tokenizer.pad_token = tokenizer.unk_token\n    tokenizer.pad_token_id = tokenizer.unk_token_id\n    model_instance = AutoModelForCausalLM.from_pretrained(\n        local_dir, torch_dtype=torch.float16\n    ).eval()\n\n    logger.info(f\"Loading dataset from {dataset.path}...\")\n    test_dataset = pd.read_csv(dataset.path).assign(\n        messages=lambda df: df[\"messages\"].apply(lambda x: eval(x.replace(\"\\n\", \",\")))\n    )\n\n    predictions_df = []\n    for _, row in tqdm(test_dataset.iterrows(), total=test_dataset.shape[0]):\n        user_input = row[\"messages\"][0][\"content\"]\n        reference = row[\"messages\"][1][\"content\"]\n        response = extract_response(\n            generate(\n                model_instance,\n                tokenizer,\n                build_prompt(tokenizer, user_input),\n                max_new_tokens=64,\n            )\n        )\n        predictions_df.append(\n            {\n                \"user_input\": user_input,\n                \"reference\": reference,\n                \"response\": response,\n            }\n        )\n\n    logger.info(f\"Writing predictions to {predictions}...\")\n    pd.DataFrame(predictions_df).to_csv(predictions, index=False)\n\n"
+          ],
+          "image": "pytorch/pytorch:2.8.0-cuda12.9-cudnn9-devel",
+          "resources": {
+            "accelerator": {
+              "count": "1",
+              "type": "NVIDIA_TESLA_T4"
+            },
+            "cpuLimit": 16.0,
+            "memoryLimit": 50.0
+          }
+        }
+      }
+    }
+  },
+  "pipelineInfo": {
+    "description": "Model training pipeline definition.",
+    "name": "pipeline-test"
+  },
+  "root": {
+    "dag": {
+      "outputs": {
+        "artifacts": {
+          "evaluation-component-metrics": {
+            "artifactSelectors": [
+              {
+                "outputArtifactKey": "metrics",
+                "producerSubtask": "evaluation-component"
+              }
+            ]
+          },
+          "fine-tuning-component-metrics": {
+            "artifactSelectors": [
+              {
+                "outputArtifactKey": "metrics",
+                "producerSubtask": "fine-tuning-component"
+              }
+            ]
+          }
+        }
+      },
+      "tasks": {
+        "data-transformation-component": {
+          "cachingOptions": {
+            "enableCache": true
+          },
+          "componentRef": {
+            "name": "comp-data-transformation-component"
+          },
+          "inputs": {
+            "parameters": {
+              "raw_dataset_uri": {
+                "componentInputParameter": "raw_dataset_uri"
+              },
+              "train_test_split_ratio": {
+                "runtimeValue": {
+                  "constant": 0.1
+                }
+              }
+            }
+          },
+          "taskInfo": {
+            "name": "data-transformation-component"
+          }
+        },
+        "evaluation-component": {
+          "cachingOptions": {
+            "enableCache": true
+          },
+          "componentRef": {
+            "name": "comp-evaluation-component"
+          },
+          "dependentTasks": [
+            "inference-component"
+          ],
+          "inputs": {
+            "artifacts": {
+              "predictions": {
+                "taskOutputArtifact": {
+                  "outputArtifactKey": "predictions",
+                  "producerTask": "inference-component"
+                }
+              }
+            }
+          },
+          "taskInfo": {
+            "name": "evaluation-component"
+          }
+        },
+        "fine-tuning-component": {
+          "cachingOptions": {
+            "enableCache": true
+          },
+          "componentRef": {
+            "name": "comp-fine-tuning-component"
+          },
+          "dependentTasks": [
+            "data-transformation-component"
+          ],
+          "inputs": {
+            "artifacts": {
+              "dataset": {
+                "taskOutputArtifact": {
+                  "outputArtifactKey": "train_dataset",
+                  "producerTask": "data-transformation-component"
+                }
+              }
+            }
+          },
+          "taskInfo": {
+            "name": "fine-tuning-component"
+          }
+        },
+        "inference-component": {
+          "cachingOptions": {
+            "enableCache": true
+          },
+          "componentRef": {
+            "name": "comp-inference-component"
+          },
+          "dependentTasks": [
+            "data-transformation-component",
+            "fine-tuning-component"
+          ],
+          "inputs": {
+            "artifacts": {
+              "dataset": {
+                "taskOutputArtifact": {
+                  "outputArtifactKey": "test_dataset",
+                  "producerTask": "data-transformation-component"
+                }
+              },
+              "model": {
+                "taskOutputArtifact": {
+                  "outputArtifactKey": "model",
+                  "producerTask": "fine-tuning-component"
+                }
+              }
+            }
+          },
+          "taskInfo": {
+            "name": "inference-component"
+          }
+        }
+      }
+    },
+    "inputDefinitions": {
+      "parameters": {
+        "raw_dataset_uri": {
+          "parameterType": "STRING"
+        }
+      }
+    },
+    "outputDefinitions": {
+      "artifacts": {
+        "evaluation-component-metrics": {
+          "artifactType": {
+            "schemaTitle": "system.Metrics",
+            "schemaVersion": "0.0.1"
+          }
+        },
+        "fine-tuning-component-metrics": {
+          "artifactType": {
+            "schemaTitle": "system.Metrics",
+            "schemaVersion": "0.0.1"
+          }
+        }
+      }
+    }
+  },
+  "schemaVersion": "2.1.0",
+  "sdkVersion": "kfp-2.8.0"
+}
