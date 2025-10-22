@@ -1,11 +1,12 @@
 """Chainlit app integrating a custom LLM chat model API."""
 
 import re
-import subprocess
 
 import chainlit as cl
 import requests
 from chainlit.message import Message
+from google.auth import default
+from google.auth.transport.requests import Request
 from transformers import AutoTokenizer
 
 from src.constants import ENDPOINT_ID, PROJECT_NUMBER
@@ -61,31 +62,40 @@ def extract_response(generated_text: str) -> str:
 
 def call_model_api(message: Message) -> str:
     """Call the custom LLM chat model API."""
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_REPO_ID)
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(MODEL_REPO_ID)
 
-    access_token = subprocess.check_output(
-        ["gcloud", "auth", "print-access-token"], text=True
-    ).strip()
+        # Get access token using Google Auth library
+        credentials, project = default()
+        credentials.refresh(Request())
+        access_token = credentials.token
 
-    templated_input = build_prompt(tokenizer, message.content)
-    model_input = {
-        "instances": [{"input": templated_input}],
-        "parameters": {
-            "maxOutputTokens": 128,
-            "temperature": 0.1,
-            "topP": 0.8,
-        },
-    }
-    response = requests.post(
-        ENDPOINT_URL,
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json",
-        },
-        json=model_input,
-    ).json()
-    raw_model_response = response["predictions"][0]
+        templated_input = build_prompt(tokenizer, message.content)
+        model_input = {
+            "instances": [{"input": templated_input}],
+            "parameters": {
+                "temperature": 0.1,
+                "top_p": 0.8,              # ✅ Correct
+                "max_new_tokens": 512,   
+            },
+        }
 
-    extracted_response = extract_response(raw_model_response)
+        response = requests.post(
+            ENDPOINT_URL,
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+            },
+            json=model_input,
+        ).json()
 
-    return extracted_response
+        # Debug: check what's in the response
+        if "predictions" not in response:
+            return f"❌ Error from API: {response.get('error', response)}"
+
+        raw_model_response = response["predictions"][0]
+        extracted_response = extract_response(raw_model_response)
+        return extracted_response
+
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
