@@ -44,6 +44,8 @@ def fine_tuning_component(
     logger = logging.getLogger(__name__)
     logger.info("Starting fine tuning process...")
 
+    # Adjusted for summarization: longer sequences, smaller per-device batch size
+    # with gradient accumulation to keep effective batch size reasonable.
     hyperparameters = {
         "model_name": "microsoft/Phi-3-mini-4k-instruct",
         "val_split_ratio": 0.2,
@@ -52,9 +54,9 @@ def fine_tuning_component(
         "lora_dropout": 0.05,
         "learning_rate": 3e-4,
         "num_epochs": 10,
-        "batch_size": 16,
-        "max_length": 64,
-        "gradient_accumulation_steps": 1,
+        "batch_size": 4,
+        "max_length": 128,
+        "gradient_accumulation_steps": 4,
     }
 
     logger.info("Creating training configurations...")

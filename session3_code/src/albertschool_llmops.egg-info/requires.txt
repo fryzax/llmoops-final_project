@@ -14,3 +14,5 @@ transformers==4.46.*
 accelerate>=1.10.1
 trl>=0.17.0
 peft==0.13.2
+chainlit>=1.0.0
+requests>=2.31.0

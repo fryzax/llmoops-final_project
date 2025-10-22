@@ -2,11 +2,13 @@ README.md
 pyproject.toml
 src/__init__.py
 src/constants.py
+src/handler.py
 src/albertschool_llmops.egg-info/PKG-INFO
 src/albertschool_llmops.egg-info/SOURCES.txt
 src/albertschool_llmops.egg-info/dependency_links.txt
 src/albertschool_llmops.egg-info/requires.txt
 src/albertschool_llmops.egg-info/top_level.txt
+src/app/main.py
 src/pipeline_components/__init__.py
 src/pipeline_components/data_transformation_component.py
 src/pipeline_components/evaluation_component.py

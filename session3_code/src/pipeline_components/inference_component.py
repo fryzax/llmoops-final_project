@@ -111,7 +111,7 @@ def inference_component(
                 model_instance,
                 tokenizer,
                 build_prompt(tokenizer, user_input),
-                max_new_tokens=64,
+                max_new_tokens=128,
             )
         )
         predictions_df.append(
