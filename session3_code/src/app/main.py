@@ -143,28 +143,35 @@ async def handle_message(message: Message):
    
     @observe(name="vertex_ai_summarization", as_type="generation")
     def llm_call(prompt: str):
+        """
+        Appelle le modèle Vertex AI et logge toutes les métriques clés
+        dans Langfuse (au niveau metadata pour qu'elles soient indexées).
+        """
         start = time.perf_counter()
         output, raw_resp = call_model_api(prompt)
         duration = time.perf_counter() - start
 
+        # Comptage des tokens
         input_tokens = len(tokenizer.encode(prompt))
         output_tokens = len(tokenizer.encode(output))
         total_tokens = input_tokens + output_tokens
 
+        # ✅ Toutes les métriques importantes dans metadata
         return {
             "output": output,
-            "attributes": {
+            "metadata": {
                 "model": MODEL_REPO_ID,
-                "input_tokens": input_tokens,
-                "output_tokens": output_tokens,
-                "total_tokens": total_tokens,
                 "endpoint_id": ENDPOINT_ID,
                 "project_number": PROJECT_NUMBER,
                 "latency_seconds": round(duration, 2),
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "total_tokens": total_tokens,
                 "article_word_count": len(message.content.split()),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
         }
+
 
     #Call the model : 1st call
     try:
