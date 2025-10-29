@@ -48,14 +48,14 @@ def fine_tuning_component(
     # with gradient accumulation to keep effective batch size reasonable.
     hyperparameters = {
         "model_name": "microsoft/Phi-3-mini-4k-instruct",
-        "val_split_ratio": 0.2,
+        "val_split_ratio": 0.1,
         "lora_r": 8,
         "lora_alpha": 16,
-        "lora_dropout": 0.05,
-        "learning_rate": 3e-4,
-        "num_epochs": 10,
+        "lora_dropout": 0.1,
+        "learning_rate": 2e-5,
+        "num_epochs": 5,
         "batch_size": 4,
-        "max_length": 128,
+        "max_length": 512,
         "gradient_accumulation_steps": 4,
     }
 
@@ -72,7 +72,7 @@ def fine_tuning_component(
         bias="none",
         lora_dropout=hyperparameters["lora_dropout"],
         task_type="CAUSAL_LM",
-        target_modules=["o_proj", "qkv_proj", "gate_up_proj", "down_proj"],
+        target_modules=["o_proj", "qkv_proj", "gate_up_proj", "down_proj", "lm_head", "dense"]
     )
     sft_config = SFTConfig(
         output_dir=model.path,

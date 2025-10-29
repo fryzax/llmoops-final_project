@@ -15,5 +15,5 @@ ENDPOINT_ID: str | None = os.getenv("GCP_ENDPOINT_ID")
 
 # Paths
 
-RAW_DATASET_URI: str = f"gs://{BUCKET_NAME}/data_llmops_test.csv"
+RAW_DATASET_URI: str = f"gs://{BUCKET_NAME}/data_newsmind_test.csv"
 PIPELINE_ROOT_PATH: str = f"{BUCKET_NAME}/vertexai-pipeline-cnn/"
